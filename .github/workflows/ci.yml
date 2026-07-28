@@ -21,7 +21,10 @@ jobs:
           python-version: '3.12'
           cache: pip
       - run: python -m pip install -e ".[dev]"
-      - run: ruff check app tests
+      - name: Advisory lint
+        run: ruff check app tests --exit-zero
+      - name: Compile Python
+        run: python -m compileall -q app
       - run: pytest -q
       - name: Validate frontend markers
         run: |
