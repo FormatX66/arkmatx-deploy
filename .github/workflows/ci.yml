@@ -3,16 +3,19 @@ name: Validate Arkmatx Deploy
 on:
   push:
     branches: [main, dev/platform-v1]
+    paths-ignore: ["receipts/**"]
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -25,3 +28,25 @@ jobs:
           grep -Fq 'ARKMATX DEPLOY' frontend/index.html
           grep -Fq 'TEST BUILD' frontend/index.html
           grep -Fq 'credentials_saved' app/network.py
+      - name: Record verified CI receipt
+        if: github.event_name == 'push' && github.ref == 'refs/heads/dev/platform-v1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p receipts
+          verified_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          cat > receipts/ci.json <<EOF
+          {
+            "branch": "dev/platform-v1",
+            "source_sha": "${GITHUB_SHA}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "verified_at_utc": "${verified_at}",
+            "status": "verified"
+          }
+          EOF
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add receipts/ci.json
+          git commit -m 'Record verified Arkmatx CI [skip ci]' || exit 0
+          git pull --rebase origin dev/platform-v1
+          git push origin HEAD:dev/platform-v1
