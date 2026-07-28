@@ -29,15 +29,16 @@ jobs:
           grep -Fq 'TEST BUILD' frontend/index.html
           grep -Fq 'credentials_saved' app/network.py
       - name: Record verified CI receipt
-        if: github.event_name == 'push' && github.ref == 'refs/heads/dev/platform-v1'
+        if: github.event_name == 'push'
         shell: bash
         run: |
           set -euo pipefail
+          branch_name="${GITHUB_REF_NAME}"
           mkdir -p receipts
           verified_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           cat > receipts/ci.json <<EOF
           {
-            "branch": "dev/platform-v1",
+            "branch": "${branch_name}",
             "source_sha": "${GITHUB_SHA}",
             "run_id": "${GITHUB_RUN_ID}",
             "verified_at_utc": "${verified_at}",
@@ -48,5 +49,5 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add receipts/ci.json
           git commit -m 'Record verified Arkmatx CI [skip ci]' || exit 0
-          git pull --rebase origin dev/platform-v1
-          git push origin HEAD:dev/platform-v1
+          git pull --rebase origin "${branch_name}"
+          git push origin HEAD:"${branch_name}"
