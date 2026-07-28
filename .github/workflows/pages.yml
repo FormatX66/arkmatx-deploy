@@ -32,7 +32,7 @@ jobs:
           grep -Fq 'ARKMATX DEPLOY' frontend/index.html
           grep -Fq 'TEST BUILD' frontend/index.html
           test -s frontend/app.js
-          test -s frontend/styles.css
+          test -s frontend/app.css
 
       - name: Publish preview link in workflow summary
         shell: bash
