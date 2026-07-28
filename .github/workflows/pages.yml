@@ -1,4 +1,4 @@
-name: Publish mobile test preview
+name: Validate mobile test preview
 
 on:
   push:
@@ -8,26 +8,41 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: mobile-preview
   cancel-in-progress: true
 
+env:
+  PREVIEW_URL: https://raw.githack.com/FormatX66/arkmatx-deploy/main/frontend/index.html
+
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  preview:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
-      - uses: actions/configure-pages@v6
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend
-      - id: deployment
-        uses: actions/deploy-pages@v4
+
+      - name: Validate static mobile preview
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s frontend/index.html
+          grep -Fq 'ARKMATX DEPLOY' frontend/index.html
+          grep -Fq 'TEST BUILD' frontend/index.html
+          test -s frontend/app.js
+          test -s frontend/styles.css
+
+      - name: Publish preview link in workflow summary
+        shell: bash
+        run: |
+          {
+            echo '## Arkmatx Deploy mobile preview'
+            echo
+            echo "Open: ${PREVIEW_URL}"
+            echo
+            echo "Source commit: ${GITHUB_SHA}"
+            echo
+            echo 'GitHub Pages remains optional; this preview requires no repository Pages setting.'
+          } >> "$GITHUB_STEP_SUMMARY"
