@@ -1,0 +1,7 @@
+{
+  "branch": "dev/platform-v1",
+  "source_sha": "1d5f813697c47c2355a54477d554db36bfb7ae41",
+  "tests": 6,
+  "status": "verified-local",
+  "notes": "FastAPI API flow, command safety gates, and password non-echo tests passed in an isolated runtime."
+}

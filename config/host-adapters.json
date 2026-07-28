@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "adapters": [
+    {"id":"ssh-sftp","label":"SSH / SFTP","ports":[22],"capabilities":["discover","backup","upload","verify","rollback"]},
+    {"id":"ftp","label":"FTP","ports":[21],"capabilities":["discover","backup","upload","verify"]},
+    {"id":"ftps","label":"FTPS","ports":[990,21],"capabilities":["discover","backup","upload","verify"]},
+    {"id":"cpanel","label":"cPanel","ports":[2083],"capabilities":["discover","api","backup","upload","verify","rollback"]},
+    {"id":"plesk","label":"Plesk","ports":[8443],"capabilities":["discover","api","backup","upload","verify","rollback"]},
+    {"id":"directadmin","label":"DirectAdmin","ports":[2222],"capabilities":["discover","api","backup","upload","verify","rollback"]},
+    {"id":"generic-api","label":"HTTPS API","ports":[443],"capabilities":["discover","api"]}
+  ]
+}
