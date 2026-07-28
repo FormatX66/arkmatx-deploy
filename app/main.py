@@ -1,23 +1,46 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
 
 from app.boxbrain import boxbrain_status
 from app.commands import parse_command
-from app.config import get_settings
-from app.models import CommandRequest, HostDetectRequest, ProjectCreate, TaskApproval
+from app.config import Settings, get_settings
+from app.host_connection import HostConnectionError, SUPPORTED_PROTOCOLS, test_host_connection
+from app.models import (
+    CommandRequest,
+    HostConnectionTestRequest,
+    HostDetectRequest,
+    ProjectCreate,
+    TaskApproval,
+)
 from app.network import detect_host, normalize_domain
+from app.rate_limit import SlidingWindowLimiter
 from app.store import Store
 
 FRONTEND = Path(__file__).resolve().parent.parent / "frontend"
 
 
-def create_app(database_path: str | None = None) -> FastAPI:
-    settings = get_settings()
+def create_app(
+    database_path: str | None = None, settings_override: Settings | None = None
+) -> FastAPI:
+    settings = settings_override or get_settings()
     store = Store(database_path or settings.database_path)
-    app = FastAPI(title=settings.app_name, version="0.1.0")
+    limiter = SlidingWindowLimiter(
+        settings.connection_test_rate_limit, settings.connection_test_rate_window_seconds
+    )
+    app = FastAPI(title=settings.app_name, version="0.2.0")
     app.state.store = store
+    app.state.connection_limiter = limiter
+
+    @app.middleware("http")
+    async def protect_sensitive_responses(request: Request, call_next):
+        response = await call_next(request)
+        if request.url.path.startswith("/api/hosts"):
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["X-Content-Type-Options"] = "nosniff"
+        return response
 
     @app.get("/api/health")
     def health():
@@ -26,6 +49,8 @@ def create_app(database_path: str | None = None) -> FastAPI:
             "service": "arkmatx-deploy",
             "environment": settings.environment,
             "network_probes": settings.allow_network_probes,
+            "host_authentication_tests": settings.allow_network_probes,
+            "supported_host_protocols": sorted(SUPPORTED_PROTOCOLS),
         }
 
     @app.get("/api/projects")
@@ -49,6 +74,42 @@ def create_app(database_path: str | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         result["username_received"] = bool(payload.username)
         result["password_received"] = payload.password is not None
+        return result
+
+    @app.post("/api/hosts/test")
+    def test_connection(payload: HostConnectionTestRequest, request: Request, response: Response):
+        client_key = request.client.host if request.client else "unknown"
+        if not limiter.allow(client_key):
+            raise HTTPException(
+                status_code=429,
+                detail="Too many connection tests. Wait a minute and try again.",
+                headers={"Retry-After": str(settings.connection_test_rate_window_seconds)},
+            )
+
+        password: str | None = None
+        try:
+            domain = normalize_domain(payload.domain)
+            password = payload.password.get_secret_value()
+            result = test_host_connection(
+                domain,
+                payload.protocol,
+                payload.port,
+                payload.username,
+                password,
+                settings,
+            )
+        except HostConnectionError as exc:
+            status_code = 503 if exc.code == "network-tests-disabled" else 400
+            raise HTTPException(
+                status_code=status_code,
+                detail={"code": exc.code, "message": exc.message},
+            ) from exc
+        except (ValueError, OSError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        finally:
+            password = None
+
+        response.headers["Cache-Control"] = "no-store, max-age=0"
         return result
 
     @app.post("/api/commands", status_code=201)

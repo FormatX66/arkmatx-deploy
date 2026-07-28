@@ -37,17 +37,36 @@
       <div id="projects" class="cards"></div>
     </section>
 
-    <section class="panel">
+    <section class="panel host-panel">
       <p class="eyebrow">CONNECT A HOST</p>
-      <h2>Domain login</h2>
-      <p class="muted">Credentials are used only for the connection request and are never saved in this browser.</p>
+      <h2>Test a hosting login</h2>
+      <p class="muted">One read-only login test. No command is run, no file is uploaded, and the password is discarded immediately.</p>
+      <div id="hostTestState" class="connection-state">Checking backend connection-test capability…</div>
       <form id="hostForm" class="stack">
-        <label>Domain<input id="hostDomain" placeholder="example.com" required></label>
-        <label>Username<input id="hostUser" autocomplete="username" placeholder="hosting username"></label>
-        <label>Password<input id="hostPassword" type="password" autocomplete="current-password" placeholder="hosting password"></label>
-        <button>DETECT CONNECTION</button>
+        <label>Domain or server hostname<input id="hostDomain" inputmode="url" autocapitalize="none" autocomplete="url" placeholder="server.example.com" required></label>
+        <label>Hosting username<input id="hostUser" autocapitalize="none" autocomplete="username" placeholder="hosting username" required></label>
+        <label>Password<input id="hostPassword" type="password" autocomplete="current-password" placeholder="hosting password" required></label>
+        <details class="advanced">
+          <summary>Advanced connection settings</summary>
+          <div class="advanced-grid">
+            <label>Connection type
+              <select id="hostProtocol">
+                <option value="auto">Auto-detect</option>
+                <option value="ssh/sftp">SSH / SFTP</option>
+                <option value="ftps">FTPS</option>
+                <option value="ftp">FTP</option>
+                <option value="cpanel">cPanel</option>
+                <option value="plesk">Plesk</option>
+                <option value="directadmin">DirectAdmin</option>
+                <option value="https/api">HTTPS / API reachability</option>
+              </select>
+            </label>
+            <label>Custom port<input id="hostPort" type="number" min="1" max="65535" inputmode="numeric" placeholder="Automatic"></label>
+          </div>
+        </details>
+        <button id="hostTestButton">TEST CONNECTION</button>
       </form>
-      <div id="hostResult" class="result">SSH/SFTP, FTP/FTPS, cPanel, Plesk, DirectAdmin and HTTPS/API are checked by the adapter layer.</div>
+      <div id="hostResult" class="result">Ready for SSH/SFTP, FTP/FTPS, cPanel, Plesk, DirectAdmin, and HTTPS checks when the Arkmatx backend is online.</div>
     </section>
 
     <section class="grid-two">
