@@ -83,7 +83,10 @@ def create_app(
             raise HTTPException(
                 status_code=429,
                 detail="Too many connection tests. Wait a minute and try again.",
+                headers={"Retry-After": str(settings.connection_test_rate_window_seconds)},
             )
+
+        password: str | None = None
         try:
             domain = normalize_domain(payload.domain)
             password = payload.password.get_secret_value()
@@ -105,6 +108,7 @@ def create_app(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         finally:
             password = None
+
         response.headers["Cache-Control"] = "no-store, max-age=0"
         return result
 
