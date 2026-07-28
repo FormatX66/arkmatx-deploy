@@ -52,11 +52,17 @@ class Store:
     def __init__(self, path: str):
         self.path = path
         self.lock = threading.RLock()
-        if path != ":memory:":
+        self._memory_connection: sqlite3.Connection | None = None
+        if path == ":memory:":
+            self._memory_connection = sqlite3.connect(":memory:", check_same_thread=False)
+            self._memory_connection.row_factory = sqlite3.Row
+        else:
             Path(path).parent.mkdir(parents=True, exist_ok=True)
         self.init()
 
     def connect(self) -> sqlite3.Connection:
+        if self._memory_connection is not None:
+            return self._memory_connection
         connection = sqlite3.connect(self.path, check_same_thread=False)
         connection.row_factory = sqlite3.Row
         return connection
@@ -81,17 +87,18 @@ class Store:
         return [dict(row) for row in rows]
 
     def list_projects(self):
-        with self.connect() as db:
+        with self.lock, self.connect() as db:
             return self.rows(db.execute("SELECT * FROM projects ORDER BY created_at"))
 
     def create_project(self, name: str, repository: str, site_url: str):
         with self.lock, self.connect() as db:
             project_id = self._insert_project(db, name, repository, site_url, "draft")
             db.commit()
-            return dict(db.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone())
+            row = db.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+            return dict(row)
 
     def list_hosts(self):
-        with self.connect() as db:
+        with self.lock, self.connect() as db:
             return self.rows(db.execute("SELECT * FROM hosts ORDER BY created_at DESC"))
 
     def create_host(self, name: str, domain: str, protocol: str, username: str, status: str):
@@ -102,10 +109,11 @@ class Store:
                 (host_id, name, domain, protocol, username, status, now()),
             )
             db.commit()
-            return dict(db.execute("SELECT * FROM hosts WHERE id=?", (host_id,)).fetchone())
+            row = db.execute("SELECT * FROM hosts WHERE id=?", (host_id,)).fetchone()
+            return dict(row)
 
     def list_tasks(self):
-        with self.connect() as db:
+        with self.lock, self.connect() as db:
             rows = db.execute("SELECT * FROM tasks ORDER BY created_at DESC LIMIT 100")
             result = self.rows(rows)
             for item in result:
@@ -138,7 +146,7 @@ class Store:
         return self.get_task(task_id)
 
     def get_task(self, task_id):
-        with self.connect() as db:
+        with self.lock, self.connect() as db:
             row = db.execute("SELECT * FROM tasks WHERE id=?", (task_id,)).fetchone()
             if row is None:
                 return None
