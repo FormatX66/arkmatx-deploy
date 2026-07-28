@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mobile-preview
@@ -46,3 +46,27 @@ jobs:
             echo
             echo 'GitHub Pages remains optional; this preview requires no repository Pages setting.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Record verified preview receipt
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p receipts
+          verified_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          cat > receipts/preview.json <<EOF
+          {
+            "url": "${PREVIEW_URL}",
+            "branch": "main",
+            "source_sha": "${GITHUB_SHA}",
+            "run_id": "${GITHUB_RUN_ID}",
+            "verified_at_utc": "${verified_at}",
+            "status": "verified-live"
+          }
+          EOF
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add receipts/preview.json
+          git commit -m 'Record verified mobile preview [skip ci]' || exit 0
+          git pull --rebase origin main
+          git push origin HEAD:main
