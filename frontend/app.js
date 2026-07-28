@@ -1,17 +1,26 @@
 (()=>{
   const $=id=>document.getElementById(id);
+  const params=new URLSearchParams(location.search);
+  const apiBase=(params.get('api')||'').replace(/\/+$/,'');
+  const apiUrl=path=>`${apiBase}/api${path}`;
   let liveApi=false;
+  let hostTestsEnabled=false;
   const demoProjects=[{id:'demo',name:'Demo Website',repository:'',site_url:'',status:'ready'}];
   let demoTasks=[];
 
   async function request(path,options={}){
-    if(!liveApi)throw new Error('demo');
-    const response=await fetch(`/api${path}`,{
+    if(!liveApi)throw new Error('Arkmatx backend is not online.');
+    const response=await fetch(apiUrl(path),{
+      cache:'no-store',
       ...options,
       headers:{'Content-Type':'application/json',...(options.headers||{})},
     });
     const data=await response.json().catch(()=>({}));
-    if(!response.ok)throw new Error(data.detail||`HTTP ${response.status}`);
+    if(!response.ok){
+      const detail=data.detail;
+      const message=typeof detail==='object'?(detail.message||JSON.stringify(detail)):(detail||`HTTP ${response.status}`);
+      throw new Error(message);
+    }
     return data;
   }
 
@@ -66,29 +75,72 @@
     }catch(error){alert(error.message)}
   }
 
-  async function detectHost(event){
-    event.preventDefault();const payload={domain:$('hostDomain').value,username:$('hostUser').value,password:$('hostPassword').value||null,protocol:'auto'};
-    try{
-      let data;
-      if(liveApi)data=await request('/hosts/detect',{method:'POST',body:JSON.stringify(payload)});
-      else data={domain:payload.domain,probe_mode:'demo',credentials_saved:false,candidates:['ssh/sftp','ftp','ftps','cpanel','plesk','directadmin','https/api'].map((protocol,i)=>({protocol,port:[22,21,990,2083,8443,2222,443][i],status:'ready-to-test'}))};
+  function describeHostResult(data){
+    const parts=[`${String(data.status||'unknown').toUpperCase()}: ${data.message||'Test complete.'}`];
+    if(data.protocol&&data.protocol!=='auto')parts.push(`${data.protocol} on port ${data.port}`);
+    if(data.capabilities?.length)parts.push(`Available: ${data.capabilities.join(', ')}`);
+    if(data.host_key?.sha256)parts.push(`SSH key: SHA256:${data.host_key.sha256}`);
+    if(data.alternatives?.length)parts.push(`Also reachable: ${data.alternatives.map(x=>`${x.protocol}:${x.port}`).join(', ')}`);
+    parts.push('Password discarded; nothing was changed.');
+    return parts.join(' · ');
+  }
+
+  async function testHost(event){
+    event.preventDefault();
+    const password=$('hostPassword').value;
+    const portValue=$('hostPort').value.trim();
+    const payload={
+      domain:$('hostDomain').value.trim(),
+      username:$('hostUser').value.trim(),
+      password,
+      protocol:$('hostProtocol').value,
+      port:portValue?Number(portValue):null,
+    };
+    const button=$('hostTestButton');
+    if(!liveApi||!hostTestsEnabled){
       $('hostPassword').value='';
-      setResult($('hostResult'),`${data.domain}: ${data.candidates.map(x=>`${x.protocol} ${x.port} (${x.status})`).join(' · ')}. Password discarded.`,'good');
-    }catch(error){$('hostPassword').value='';setResult($('hostResult'),error.message,'bad')}
+      setResult($('hostResult'),'The interface is ready, but this preview has no network-enabled Arkmatx backend. No credentials were sent.','warn');
+      return;
+    }
+    button.disabled=true;button.classList.add('loading');
+    setResult($('hostResult'),'Testing one read-only connection…','');
+    try{
+      const data=await request('/hosts/test',{method:'POST',body:JSON.stringify(payload)});
+      setResult($('hostResult'),describeHostResult(data),data.authenticated?'good':(data.status==='reachable'?'warn':'bad'));
+    }catch(error){
+      setResult($('hostResult'),`${error.message} Password discarded; nothing was changed.`,'bad');
+    }finally{
+      $('hostPassword').value='';
+      button.disabled=false;button.classList.remove('loading');
+    }
   }
 
   async function loadProjects(){try{renderProjects(liveApi?(await request('/projects')).items:demoProjects)}catch{renderProjects(demoProjects)}}
   async function loadTasks(){try{renderTasks(liveApi?(await request('/tasks')).items:demoTasks)}catch{renderTasks(demoTasks)}}
-  async function loadConnectors(){try{renderConnectors(liveApi?(await request('/connectors')).items:[{name:'BoxBrain',status:'demo-safe'},{name:'Brain Connect',status:'adapter-ready'}])}catch{renderConnectors([{name:'BoxBrain',status:'offline'},{name:'Brain Connect',status:'adapter-ready'}])}}
+  async function loadConnectors(){try{renderConnectors(liveApi?(await request('/connectors')).items:[{name:'BoxBrain',status:'preview-safe'},{name:'Brain Connect',status:'adapter-ready'}])}catch{renderConnectors([{name:'BoxBrain',status:'offline'},{name:'Brain Connect',status:'adapter-ready'}])}}
 
   $('commandForm').addEventListener('submit',event=>{event.preventDefault();runCommand($('commandInput').value);});
   document.querySelectorAll('[data-command]').forEach(button=>button.addEventListener('click',()=>runCommand(button.dataset.command)));
-  $('hostForm').addEventListener('submit',detectHost);
+  $('hostForm').addEventListener('submit',testHost);
   $('refreshProjects').addEventListener('click',loadProjects);
 
   (async()=>{
-    try{const r=await fetch('/api/health',{cache:'no-store'});if(!r.ok)throw new Error();liveApi=true;$('healthText').textContent='API ONLINE';document.querySelector('.health').classList.add('ok');}
-    catch{$('healthText').textContent='DEMO MODE';document.querySelector('.health').classList.add('bad');}
+    const health=document.querySelector('.health');
+    const state=$('hostTestState');
+    try{
+      const r=await fetch(apiUrl('/health'),{cache:'no-store'});if(!r.ok)throw new Error();
+      const data=await r.json();
+      liveApi=true;hostTestsEnabled=Boolean(data.host_authentication_tests);
+      $('healthText').textContent=hostTestsEnabled?'HOST TEST READY':'API ONLINE';
+      health.classList.add(hostTestsEnabled?'ok':'warn');
+      state.textContent=hostTestsEnabled?'Backend online. Read-only connection testing is enabled.':'Backend online, but network connection tests are disabled by policy.';
+      state.classList.add(hostTestsEnabled?'ready':'off');
+      $('hostTestButton').disabled=!hostTestsEnabled;
+    }catch{
+      $('healthText').textContent='PREVIEW ONLY';health.classList.add('warn');
+      state.textContent='Static preview only. Connect this interface to the Arkmatx backend to run a real host login test.';
+      state.classList.add('off');$('hostTestButton').disabled=true;
+    }
     await Promise.all([loadProjects(),loadTasks(),loadConnectors()]);
     if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});
   })();
