@@ -1,8 +1,6 @@
 (()=>{
   const $=id=>document.getElementById(id);
-  const params=new URLSearchParams(location.search);
-  const apiBase=(params.get('api')||'').replace(/\/+$/,'');
-  const apiUrl=path=>`${apiBase}/api${path}`;
+  const apiUrl=path=>`/api${path}`;
   let liveApi=false;
   let hostTestsEnabled=false;
   const demoProjects=[{id:'demo',name:'Demo Website',repository:'',site_url:'',status:'ready'}];
@@ -79,10 +77,16 @@
     const parts=[`${String(data.status||'unknown').toUpperCase()}: ${data.message||'Test complete.'}`];
     if(data.protocol&&data.protocol!=='auto')parts.push(`${data.protocol} on port ${data.port}`);
     if(data.capabilities?.length)parts.push(`Available: ${data.capabilities.join(', ')}`);
-    if(data.host_key?.sha256)parts.push(`SSH key: SHA256:${data.host_key.sha256}`);
+    if(data.host_key?.sha256)parts.push(`SSH key: SHA256:${data.host_key.sha256.replace(/=+$/,'')}`);
     if(data.alternatives?.length)parts.push(`Also reachable: ${data.alternatives.map(x=>`${x.protocol}:${x.port}`).join(', ')}`);
     parts.push('Password discarded; nothing was changed.');
     return parts.join(' · ');
+  }
+
+  function hostResultKind(data){
+    if(data.authenticated)return 'good';
+    if(['reachable-not-authenticated','api-unavailable','api-response-unrecognized','server-hostname-required'].includes(data.status))return 'warn';
+    return 'bad';
   }
 
   async function testHost(event){
@@ -106,12 +110,12 @@
     setResult($('hostResult'),'Testing one read-only connection…','');
     try{
       const data=await request('/hosts/test',{method:'POST',body:JSON.stringify(payload)});
-      setResult($('hostResult'),describeHostResult(data),data.authenticated?'good':(data.status==='reachable'?'warn':'bad'));
+      setResult($('hostResult'),describeHostResult(data),hostResultKind(data));
     }catch(error){
       setResult($('hostResult'),`${error.message} Password discarded; nothing was changed.`,'bad');
     }finally{
       $('hostPassword').value='';
-      button.disabled=false;button.classList.remove('loading');
+      button.disabled=!hostTestsEnabled;button.classList.remove('loading');
     }
   }
 
@@ -138,7 +142,7 @@
       $('hostTestButton').disabled=!hostTestsEnabled;
     }catch{
       $('healthText').textContent='PREVIEW ONLY';health.classList.add('warn');
-      state.textContent='Static preview only. Connect this interface to the Arkmatx backend to run a real host login test.';
+      state.textContent='Static preview only. Run the Arkmatx backend on the same secure origin to test a real hosting login.';
       state.classList.add('off');$('hostTestButton').disabled=true;
     }
     await Promise.all([loadProjects(),loadTasks(),loadConnectors()]);
