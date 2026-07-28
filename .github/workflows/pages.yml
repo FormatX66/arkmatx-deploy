@@ -2,7 +2,7 @@ name: Publish mobile test preview
 
 on:
   push:
-    branches: [dev/platform-v1]
+    branches: [main, dev/platform-v1]
     paths: ["frontend/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
@@ -24,7 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: dev/platform-v1
+          ref: ${{ github.ref_name }}
       - uses: actions/configure-pages@v6
       - uses: actions/upload-pages-artifact@v3
         with:
