@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#10131a">
+  <title>Arkmatx Deploy</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topbar">
+    <div><strong>ARKMATX DEPLOY</strong><span>BoxBrain operations console</span></div>
+    <div class="health"><i></i><span id="healthText">CHECKING</span></div>
+  </header>
+
+  <main>
+    <section class="hero panel">
+      <p class="eyebrow">SIMPLE MODE</p>
+      <h1>Tell it what to do.</h1>
+      <form id="commandForm" class="command-row">
+        <input id="commandInput" autocomplete="off" placeholder="Preview Demo Website" aria-label="Deployment command">
+        <button>RUN</button>
+      </form>
+      <p id="commandResult" class="result">Try “preview Demo Website” or “ship Demo Website.”</p>
+    </section>
+
+    <nav class="quick" aria-label="Quick actions">
+      <button data-command="preview Demo Website">👀<span>Preview</span></button>
+      <button data-command="test Demo Website">✓<span>Test</span></button>
+      <button data-command="ship Demo Website">🚀<span>Ship</span></button>
+      <button data-command="undo Demo Website">↩<span>Undo</span></button>
+    </nav>
+
+    <section class="panel">
+      <div class="section-head"><div><p class="eyebrow">PROJECTS</p><h2>Websites</h2></div><button id="refreshProjects" class="minor">REFRESH</button></div>
+      <div id="projects" class="cards"></div>
+    </section>
+
+    <section class="panel">
+      <p class="eyebrow">CONNECT A HOST</p>
+      <h2>Domain login</h2>
+      <p class="muted">Credentials are used only for the connection request and are never saved in this browser.</p>
+      <form id="hostForm" class="stack">
+        <label>Domain<input id="hostDomain" placeholder="example.com" required></label>
+        <label>Username<input id="hostUser" autocomplete="username" placeholder="hosting username"></label>
+        <label>Password<input id="hostPassword" type="password" autocomplete="current-password" placeholder="hosting password"></label>
+        <button>DETECT CONNECTION</button>
+      </form>
+      <div id="hostResult" class="result">SSH/SFTP, FTP/FTPS, cPanel, Plesk, DirectAdmin and HTTPS/API are checked by the adapter layer.</div>
+    </section>
+
+    <section class="grid-two">
+      <article class="panel"><p class="eyebrow">TASKS</p><h2>Queue</h2><div id="tasks" class="list"></div></article>
+      <article class="panel"><p class="eyebrow">CONNECTORS</p><h2>BoxBrain / Brain Connect</h2><div id="connectors" class="list"></div></article>
+    </section>
+  </main>
+
+  <footer>TEST BUILD // NO AUTOMATIC PRODUCTION EXECUTION</footer>
+  <script src="app.js"></script>
+</body>
+</html>
